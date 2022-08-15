@@ -27,10 +27,48 @@ pub struct Rule {
 
 #[wasm_bindgen]
 impl Rule {
+    pub fn freeze() -> Rule {
+        Rule {
+            born: vec![],
+            survive: vec![0, 1, 2, 3, 4, 5, 6, 7, 8],
+        }
+    }
+
     pub fn modified_seeds() -> Rule {
         Rule {
             born: vec![1, 3],
             survive: vec![0, 1, 2, 3, 4, 5, 6, 7, 8],
+        }
+    }
+
+    pub fn life() -> Rule {
+        Rule {
+            born: vec![3],
+            survive: vec![2, 3],
+        }
+    }
+}
+
+#[wasm_bindgen]
+pub struct CellSet {
+    cells: Vec<(u32, u32)>,
+}
+
+#[wasm_bindgen]
+impl CellSet {
+    pub fn lwss() -> CellSet {
+        CellSet {
+            cells: vec![
+                (46, 0),
+                (46, 3),
+                (47, 4),
+                (48, 0),
+                (48, 4),
+                (49, 1),
+                (49, 2),
+                (49, 3),
+                ((49, 4)),
+            ],
         }
     }
 }
@@ -91,12 +129,18 @@ impl Universe {
         self.cells = next;
     }
 
-    pub fn new(rule: Rule) -> Universe {
+    pub fn new(initial: CellSet, rule: Rule) -> Universe {
         let width = 99;
         let height = 99;
 
         let cells = (0..width * height)
-            .map(|i| if i == 4900 { Cell::Alive } else { Cell::Dead })
+            .map(|i| {
+                if initial.cells.contains(&(i / width, i % width)) {
+                    Cell::Alive
+                } else {
+                    Cell::Dead
+                }
+            })
             .collect();
 
         Universe {
