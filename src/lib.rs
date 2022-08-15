@@ -1,6 +1,6 @@
 mod utils;
 
-use std::fmt;
+use std::{fmt, vec};
 
 use wasm_bindgen::prelude::*;
 
@@ -19,7 +19,25 @@ pub enum Cell {
 }
 
 #[wasm_bindgen]
+#[derive(Debug)]
+pub struct Rule {
+    born: Vec<u8>,
+    survive: Vec<u8>,
+}
+
+#[wasm_bindgen]
+impl Rule {
+    pub fn modified_seeds() -> Rule {
+        Rule {
+            born: vec![1, 3],
+            survive: vec![0, 1, 2, 3, 4, 5, 6, 7, 8],
+        }
+    }
+}
+
+#[wasm_bindgen]
 pub struct Universe {
+    rule: Rule,
     width: u32,
     height: u32,
     cells: Vec<Cell>,
@@ -61,24 +79,9 @@ impl Universe {
                 let live_neighbors = self.live_neighbor_count(row, col);
 
                 let next_cell = match (cell, live_neighbors) {
-                    // Rule 1: Any live cell with fewer than two live neighbors
-                    // dies, as if caused by underpopulation.
-                    (Cell::Alive, x) if x < 2 => Cell::Dead,
-
-                    // Rule 2: Any live cell with two or three live neighbors
-                    // lives on to the next generation.
-                    (Cell::Alive, 2) | (Cell::Alive, 3) => Cell::Alive,
-
-                    // Rule 3: Any live cell with more than three live neighbors
-                    // dies, as if by overpopulation.
-                    (Cell::Alive, x) if x > 3 => Cell::Dead,
-
-                    // Rule 4: Any dead cell with exactly three live neighbors
-                    // becomes a live cell, as if by reproduction.
-                    (Cell::Dead, 3) => Cell::Alive,
-
-                    // All other cells remains in the same state
-                    (otherwise, _) => otherwise,
+                    (Cell::Dead, n) if self.rule.born.contains(&n) => Cell::Alive,
+                    (Cell::Alive, n) if self.rule.survive.contains(&n) => Cell::Alive,
+                    _ => Cell::Dead,
                 };
 
                 next[idx] = next_cell;
@@ -88,21 +91,16 @@ impl Universe {
         self.cells = next;
     }
 
-    pub fn new() -> Universe {
-        let width = 64;
-        let height = 64;
+    pub fn new(rule: Rule) -> Universe {
+        let width = 99;
+        let height = 99;
 
         let cells = (0..width * height)
-            .map(|i| {
-                if i % 2 == 0 || i % 7 == 0 {
-                    Cell::Alive
-                } else {
-                    Cell::Dead
-                }
-            })
+            .map(|i| if i == 4900 { Cell::Alive } else { Cell::Dead })
             .collect();
 
         Universe {
+            rule,
             width,
             height,
             cells,
