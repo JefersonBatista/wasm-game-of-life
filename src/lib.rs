@@ -1,5 +1,6 @@
 mod utils;
 
+use js_sys::Math;
 use std::{fmt, vec};
 
 use wasm_bindgen::prelude::*;
@@ -67,7 +68,7 @@ impl CellSet {
                 (49, 1),
                 (49, 2),
                 (49, 3),
-                ((49, 4)),
+                (49, 4),
             ],
         }
     }
@@ -151,6 +152,29 @@ impl Universe {
         }
     }
 
+    pub fn random(rule: Rule) -> Universe {
+        let width = 99;
+        let height = 99;
+
+        let cells = (0..width * height)
+            .map(|_| {
+                let rand_num = Math::random();
+                if rand_num < 0.5 {
+                    Cell::Dead
+                } else {
+                    Cell::Alive
+                }
+            })
+            .collect();
+
+        Universe {
+            rule,
+            width,
+            height,
+            cells,
+        }
+    }
+
     pub fn render(&self) -> String {
         self.to_string()
     }
@@ -175,7 +199,7 @@ impl fmt::Display for Universe {
                 let symbol = if cell == Cell::Dead { '◻' } else { '◼' };
                 write!(f, "{}", symbol)?;
             }
-            write!(f, "\n")?;
+            writeln!(f)?;
         }
 
         Ok(())
