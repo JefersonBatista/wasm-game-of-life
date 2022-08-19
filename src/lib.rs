@@ -1,7 +1,8 @@
 mod utils;
 
+use fixedbitset::FixedBitSet;
 use js_sys::Math;
-use std::{fmt, vec};
+use std::vec;
 
 use wasm_bindgen::prelude::*;
 
@@ -10,14 +11,6 @@ use wasm_bindgen::prelude::*;
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-#[wasm_bindgen]
-#[repr(u8)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Cell {
-    Dead = 0,
-    Alive = 1,
-}
 
 #[wasm_bindgen]
 #[derive(Debug)]
@@ -51,15 +44,15 @@ impl Rule {
 }
 
 #[wasm_bindgen]
-pub struct CellSet {
-    cells: Vec<(u32, u32)>,
+pub struct PositionSet {
+    positions: Vec<(u32, u32)>,
 }
 
 #[wasm_bindgen]
-impl CellSet {
-    pub fn lwss() -> CellSet {
-        CellSet {
-            cells: vec![
+impl PositionSet {
+    pub fn lwss() -> PositionSet {
+        PositionSet {
+            positions: vec![
                 (46, 0),
                 (46, 3),
                 (47, 4),
@@ -79,7 +72,7 @@ pub struct Universe {
     rule: Rule,
     width: u32,
     height: u32,
-    cells: Vec<Cell>,
+    cells: FixedBitSet,
 }
 
 impl Universe {
@@ -117,32 +110,34 @@ impl Universe {
                 let cell = self.cells[idx];
                 let live_neighbors = self.live_neighbor_count(row, col);
 
-                let next_cell = match (cell, live_neighbors) {
-                    (Cell::Dead, n) if self.rule.born.contains(&n) => Cell::Alive,
-                    (Cell::Alive, n) if self.rule.survive.contains(&n) => Cell::Alive,
-                    _ => Cell::Dead,
-                };
-
-                next[idx] = next_cell;
+                next.set(
+                    idx,
+                    match (cell, live_neighbors) {
+                        (false, n) => self.rule.born.contains(&n),
+                        (true, n) => self.rule.survive.contains(&n),
+                    },
+                )
             }
         }
 
         self.cells = next;
     }
 
-    pub fn new(initial: CellSet, rule: Rule) -> Universe {
+    pub fn new(initial: PositionSet, rule: Rule) -> Universe {
         let width = 99;
         let height = 99;
 
-        let cells = (0..width * height)
-            .map(|i| {
-                if initial.cells.contains(&(i / width, i % width)) {
-                    Cell::Alive
-                } else {
-                    Cell::Dead
-                }
-            })
-            .collect();
+        let size = (width * height) as usize;
+        let mut cells = FixedBitSet::with_capacity(size);
+
+        for i in 0..size {
+            cells.set(
+                i,
+                initial
+                    .positions
+                    .contains(&(i as u32 / width, i as u32 % width)),
+            )
+        }
 
         Universe {
             rule,
@@ -156,16 +151,13 @@ impl Universe {
         let width = 99;
         let height = 99;
 
-        let cells = (0..width * height)
-            .map(|_| {
-                let rand_num = Math::random();
-                if rand_num < 0.5 {
-                    Cell::Dead
-                } else {
-                    Cell::Alive
-                }
-            })
-            .collect();
+        let size = (width * height) as usize;
+        let mut cells = FixedBitSet::with_capacity(size);
+
+        for i in 0..size {
+            let rand_num = Math::random();
+            cells.set(i, rand_num > 0.5)
+        }
 
         Universe {
             rule,
@@ -173,10 +165,6 @@ impl Universe {
             height,
             cells,
         }
-    }
-
-    pub fn render(&self) -> String {
-        self.to_string()
     }
 
     pub fn width(&self) -> u32 {
@@ -187,21 +175,7 @@ impl Universe {
         self.height
     }
 
-    pub fn cells(&self) -> *const Cell {
-        self.cells.as_ptr()
-    }
-}
-
-impl fmt::Display for Universe {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for line in self.cells.as_slice().chunks(self.width as usize) {
-            for &cell in line {
-                let symbol = if cell == Cell::Dead { '◻' } else { '◼' };
-                write!(f, "{}", symbol)?;
-            }
-            writeln!(f)?;
-        }
-
-        Ok(())
+    pub fn cells(&self) -> *const u32 {
+        self.cells.as_slice().as_ptr()
     }
 }
