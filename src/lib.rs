@@ -28,7 +28,14 @@ impl Rule {
         }
     }
 
-    pub fn modified_seeds() -> Rule {
+    pub fn life_without_death() -> Rule {
+        Rule {
+            born: vec![3],
+            survive: vec![0, 1, 2, 3, 4, 5, 6, 7, 8],
+        }
+    }
+
+    pub fn modified_life_without_death() -> Rule {
         Rule {
             born: vec![1, 3],
             survive: vec![0, 1, 2, 3, 4, 5, 6, 7, 8],
@@ -50,6 +57,11 @@ pub struct PositionSet {
 
 #[wasm_bindgen]
 impl PositionSet {
+    pub fn glider() -> PositionSet {
+        PositionSet {
+            positions: vec![(0, 0), (1, 1), (1, 2), (2, 0), (2, 1)],
+        }
+    }
     pub fn lwss() -> PositionSet {
         PositionSet {
             positions: vec![
@@ -63,6 +75,52 @@ impl PositionSet {
                 (49, 3),
                 (49, 4),
             ],
+        }
+    }
+
+    pub fn two_lwss_accident() -> PositionSet {
+        let lwss = Self::lwss();
+        let lwss_num_cells = 9;
+
+        let mut positions = vec![(0, 0); lwss_num_cells * 2];
+        for i in 0..lwss_num_cells {
+            let (x, y) = lwss.positions[i];
+            positions[i] = (x, y);
+            positions[lwss_num_cells + i] = (y, x + 1);
+        }
+
+        Self { positions }
+    }
+
+    pub fn row(n: usize) -> PositionSet {
+        let init_x: usize = 49;
+        let init_y = 49 - n / 2;
+
+        let mut positions = vec![(0, 0); n];
+        for (i, position) in positions.iter_mut().enumerate() {
+            position.0 = (init_x) as u32;
+            position.1 = (init_y + i) as u32;
+        }
+
+        Self { positions }
+    }
+
+    pub fn column(n: usize) -> PositionSet {
+        let init_x = 49 - n / 2;
+        let init_y: usize = 49;
+
+        let mut positions = vec![(0, 0); n];
+        for (i, position) in positions.iter_mut().enumerate() {
+            position.0 = (init_x + i) as u32;
+            position.1 = (init_y) as u32;
+        }
+
+        Self { positions }
+    }
+
+    pub fn monster_without_death() -> PositionSet {
+        PositionSet {
+            positions: vec![(48, 49), (50, 48), (50, 50)],
         }
     }
 }
@@ -147,7 +205,7 @@ impl Universe {
         }
     }
 
-    pub fn random(rule: Rule) -> Universe {
+    pub fn random(life_chance: f64, rule: Rule) -> Universe {
         let width = 99;
         let height = 99;
 
@@ -156,7 +214,7 @@ impl Universe {
 
         for i in 0..size {
             let rand_num = Math::random();
-            cells.set(i, rand_num > 0.5)
+            cells.set(i, rand_num < life_chance)
         }
 
         Universe {
