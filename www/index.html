@@ -16,9 +16,24 @@
         align-items: center;
         justify-content: center;
       }
+
+      button {
+        width: 50px;
+        height: 30px;
+      }
+
+      #control {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 10px;
+      }
     </style>
   </head>
   <body>
+    <div id="control">
+      <button id="play-pause"></button>
+      <button id="step">step</button>
+    </div>
     <canvas id="game-of-life-canvas"></canvas>
     <script src="./bootstrap.js"></script>
   </body>

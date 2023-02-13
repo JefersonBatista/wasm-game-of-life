@@ -11,6 +11,8 @@ use wasm_bindgen::prelude::*;
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+static GRID_WIDTH: u32 = 240;
+static GRID_HEIGHT: u32 = 99;
 
 #[wasm_bindgen]
 #[derive(Debug)]
@@ -71,64 +73,75 @@ impl PositionSet {
     }
 
     pub fn lwss() -> PositionSet {
+        let middle = GRID_HEIGHT / 2;
         PositionSet {
             positions: vec![
-                (46, 0),
-                (46, 3),
-                (47, 4),
-                (48, 0),
-                (48, 4),
-                (49, 1),
-                (49, 2),
-                (49, 3),
-                (49, 4),
+                (middle - 3, 0),
+                (middle - 3, 3),
+                (middle - 2, 4),
+                (middle - 1, 0),
+                (middle - 1, 4),
+                (middle, 1),
+                (middle, 2),
+                (middle, 3),
+                (middle, 4),
             ],
         }
     }
 
     pub fn two_lwss_accident() -> PositionSet {
         let lwss = Self::lwss();
-        let lwss_num_cells = 9;
+        let lwss_num_cells = lwss.positions.len();
 
         let mut positions = vec![(0, 0); lwss_num_cells * 2];
         for i in 0..lwss_num_cells {
-            let (x, y) = lwss.positions[i];
-            positions[i] = (x, y);
-            positions[lwss_num_cells + i] = (y, x + 1);
+            let (y, x) = lwss.positions[i];
+            positions[i] = (y, x);
+            positions[lwss_num_cells + i] = (x, y + 1);
         }
 
         Self { positions }
     }
 
     pub fn row(n: usize) -> PositionSet {
-        let init_x: usize = 49;
-        let init_y = 49 - n / 2;
+        let middle_x = GRID_WIDTH / 2;
+        let middle_y = GRID_HEIGHT / 2;
+        let init_x = middle_x - (n as u32) / 2;
+        let init_y = middle_y;
 
         let mut positions = vec![(0, 0); n];
         for (i, position) in positions.iter_mut().enumerate() {
-            position.0 = (init_x) as u32;
-            position.1 = (init_y + i) as u32;
+            position.0 = init_y;
+            position.1 = init_x + (i as u32);
         }
 
         Self { positions }
     }
 
     pub fn column(n: usize) -> PositionSet {
-        let init_x = 49 - n / 2;
-        let init_y: usize = 49;
+        let middle_x = GRID_WIDTH / 2;
+        let middle_y = GRID_HEIGHT / 2;
+        let init_x = middle_x;
+        let init_y = middle_y - (n as u32) / 2;
 
         let mut positions = vec![(0, 0); n];
         for (i, position) in positions.iter_mut().enumerate() {
-            position.0 = (init_x + i) as u32;
-            position.1 = (init_y) as u32;
+            position.0 = init_y + (i as u32);
+            position.1 = init_x;
         }
 
         Self { positions }
     }
 
     pub fn monster_without_death() -> PositionSet {
+        let middle_x = GRID_WIDTH / 2;
+        let middle_y = GRID_HEIGHT / 2;
         PositionSet {
-            positions: vec![(48, 49), (50, 48), (50, 50)],
+            positions: vec![
+                (middle_y - 1, middle_x),
+                (middle_y + 1, middle_x - 1),
+                (middle_y + 1, middle_x + 1),
+            ],
         }
     }
 }
@@ -169,11 +182,6 @@ impl Universe {
         count
     }
 
-    /// Get the dead and alive values of the entire universe.
-    pub fn get_cells(&self) -> &FixedBitSet {
-        &self.cells
-    }
-
     /// Set cells to be alive in a universe by passing the row and column
     /// of each cell.
     pub fn set_cells(&mut self, cells: &[(u32, u32)]) {
@@ -210,8 +218,8 @@ impl Universe {
     }
 
     pub fn new(initial: PositionSet, rule: Rule) -> Universe {
-        let width = 99;
-        let height = 99;
+        let width = GRID_WIDTH;
+        let height = GRID_HEIGHT;
 
         let size = (width * height) as usize;
         let mut cells = FixedBitSet::with_capacity(size);
@@ -234,8 +242,8 @@ impl Universe {
     }
 
     pub fn random(life_chance: f64, rule: Rule) -> Universe {
-        let width = 99;
-        let height = 99;
+        let width = GRID_WIDTH;
+        let height = GRID_HEIGHT;
 
         let size = (width * height) as usize;
         let mut cells = FixedBitSet::with_capacity(size);
@@ -279,5 +287,10 @@ impl Universe {
 
     pub fn cells(&self) -> *const u32 {
         self.cells.as_slice().as_ptr()
+    }
+
+    pub fn toggle_cell(&mut self, row: u32, column: u32) {
+        let idx = self.get_index(row, column);
+        self.cells.set(idx, !self.cells[idx]);
     }
 }

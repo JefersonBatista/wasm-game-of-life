@@ -1,5 +1,5 @@
 import { memory } from "wasm-game-of-life/wasm_game_of_life_bg";
-import { Universe, Cell, Rule, PositionSet } from "wasm-game-of-life";
+import { Universe, Rule, PositionSet } from "wasm-game-of-life";
 
 const CELL_SIZE = 5; // px
 const GRID_COLOR = "#CCCCCC";
@@ -7,7 +7,10 @@ const DEAD_COLOR = "#FFFFFF";
 const ALIVE_COLOR = "#000000";
 
 // Construct the universe, and get its width and height.
-const universe = Universe.new(PositionSet.row(11), Rule.maze());
+const universe = Universe.new(
+  PositionSet.monster_without_death(),
+  Rule.life_without_death()
+);
 const width = universe.width();
 const height = universe.height();
 
@@ -19,13 +22,19 @@ canvas.width = (CELL_SIZE + 1) * width + 1;
 
 const ctx = canvas.getContext("2d");
 
-const renderLoop = () => {
+let animationId = null;
+
+const universeTick = () => {
   universe.tick();
 
   drawGrid();
   drawCells();
+};
 
-  requestAnimationFrame(renderLoop);
+const renderLoop = () => {
+  universeTick();
+
+  animationId = requestAnimationFrame(renderLoop);
 };
 
 const drawGrid = () => {
@@ -81,6 +90,51 @@ const drawCells = () => {
   ctx.stroke();
 };
 
+const playPauseButton = document.getElementById("play-pause");
+
+const isPaused = () => animationId === null;
+
+const play = () => {
+  playPauseButton.textContent = "⏸";
+  renderLoop();
+};
+
+const pause = () => {
+  playPauseButton.textContent = "▶";
+  cancelAnimationFrame(animationId);
+  animationId = null;
+};
+
+playPauseButton.addEventListener("click", (event) => {
+  isPaused() ? play() : pause();
+});
+
+const stepButton = document.getElementById("step");
+
+stepButton.addEventListener("click", (event) => {
+  universeTick();
+});
+
+canvas.addEventListener("click", (event) => {
+  const boundingRect = canvas.getBoundingClientRect();
+
+  const scaleX = canvas.width / boundingRect.width;
+  const scaleY = canvas.height / boundingRect.height;
+
+  const canvasLeft = (event.clientX - boundingRect.left) * scaleX;
+  const canvasTop = (event.clientY - boundingRect.top) * scaleY;
+
+  const row = Math.min(Math.floor(canvasTop / (CELL_SIZE + 1)), height - 1);
+  const col = Math.min(Math.floor(canvasLeft / (CELL_SIZE + 1)), width - 1);
+
+  universe.toggle_cell(row, col);
+
+  drawGrid();
+  drawCells();
+});
+
 drawGrid();
 drawCells();
-requestAnimationFrame(renderLoop);
+
+// Start with the game paused
+pause();
