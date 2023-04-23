@@ -1,16 +1,13 @@
 import { memory } from "wasm-game-of-life/wasm_game_of_life_bg";
 import { Universe, Rule, PositionSet } from "wasm-game-of-life";
 
-const CELL_SIZE = 5; // px
+const CELL_SIZE = 4; // px
 const GRID_COLOR = "#CCCCCC";
 const DEAD_COLOR = "#FFFFFF";
 const ALIVE_COLOR = "#000000";
 
 // Construct the universe, and get its width and height.
-const universe = Universe.new(
-  PositionSet.monster_without_death(),
-  Rule.life_without_death()
-);
+const universe = Universe.new(PositionSet.empty(), Rule.life());
 const width = universe.width();
 const height = universe.height();
 

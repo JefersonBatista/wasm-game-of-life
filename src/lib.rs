@@ -11,14 +11,19 @@ use wasm_bindgen::prelude::*;
 #[cfg(feature = "wee_alloc")]
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-static GRID_WIDTH: u32 = 240;
-static GRID_HEIGHT: u32 = 99;
+static GRID_WIDTH: u32 = 345;
+static GRID_HEIGHT: u32 = 149;
 
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct Rule {
     born: Vec<u8>,
     survive: Vec<u8>,
+}
+
+struct RuleInBitSet {
+    born: FixedBitSet,
+    survive: FixedBitSet,
 }
 
 #[wasm_bindgen]
@@ -56,6 +61,31 @@ impl Rule {
             born: vec![3],
             survive: vec![1, 2, 3, 4, 5],
         }
+    }
+
+    pub fn morley() -> Rule {
+        Rule {
+            born: vec![3, 6, 8],
+            survive: vec![2, 4, 5],
+        }
+    }
+}
+
+impl Rule {
+    fn to_bit_set(&self) -> RuleInBitSet {
+        let mut born = FixedBitSet::with_capacity(9);
+        let mut survive = FixedBitSet::with_capacity(9);
+
+        for i in 0..9 {
+            if self.born.contains(&i) {
+                born.set(i as usize, true)
+            };
+            if self.survive.contains(&i) {
+                survive.set(i as usize, true)
+            };
+        }
+
+        RuleInBitSet { born, survive }
     }
 }
 
@@ -144,20 +174,19 @@ impl PositionSet {
             ],
         }
     }
-}
 
-impl PositionSet {
-    pub fn empty() -> Self {
+    pub fn empty() -> PositionSet {
         PositionSet { positions: vec![] }
     }
 }
 
 #[wasm_bindgen]
 pub struct Universe {
-    rule: Rule,
+    rule: RuleInBitSet,
     width: u32,
     height: u32,
     cells: FixedBitSet,
+    next_cells_to_be_updated: FixedBitSet,
 }
 
 impl Universe {
@@ -182,12 +211,29 @@ impl Universe {
         count
     }
 
+    fn mark_neighbor_to_update(&mut self, row: u32, column: u32) {
+        for delta_row in [self.height - 1, 0, 1].iter().cloned() {
+            for delta_col in [self.width - 1, 0, 1].iter().cloned() {
+                let neighbor_row = (row + delta_row) % self.height;
+                let neighbor_col = (column + delta_col) % self.width;
+                let idx = self.get_index(neighbor_row, neighbor_col);
+                self.next_cells_to_be_updated.set(idx, true);
+            }
+        }
+    }
+
+    /// Get the dead and alive cells of the entire universe
+    pub fn get_cells(&self) -> &FixedBitSet {
+        &self.cells
+    }
+
     /// Set cells to be alive in a universe by passing the row and column
     /// of each cell.
-    pub fn set_cells(&mut self, cells: &[(u32, u32)]) {
+    pub fn turn_cells_alive(&mut self, cells: &[(u32, u32)]) {
         for (row, col) in cells.iter().cloned() {
             let idx = self.get_index(row, col);
             self.cells.set(idx, true);
+            self.mark_neighbor_to_update(row, col);
         }
     }
 }
@@ -197,20 +243,32 @@ impl Universe {
 impl Universe {
     pub fn tick(&mut self) {
         let mut next = self.cells.clone();
+        let current_cells_to_be_updated = self.next_cells_to_be_updated.clone();
+        self.next_cells_to_be_updated.set_range(.., false);
 
         for row in 0..self.height {
             for col in 0..self.width {
                 let idx = self.get_index(row, col);
-                let cell = self.cells[idx];
-                let live_neighbors = self.live_neighbor_count(row, col);
 
-                next.set(
-                    idx,
-                    match (cell, live_neighbors) {
-                        (false, n) => self.rule.born.contains(&n),
-                        (true, n) => self.rule.survive.contains(&n),
-                    },
-                )
+                // Maybe it's not necessary to update a cell
+                if !current_cells_to_be_updated[idx] {
+                    continue;
+                }
+
+                let cell = self.cells[idx];
+                let n = self.live_neighbor_count(row, col);
+
+                // If the cell is born, mark itself and neighbors to be updated at next tick
+                if !cell && self.rule.born[n as usize] {
+                    next.set(idx, true);
+                    self.mark_neighbor_to_update(row, col);
+                }
+
+                // If the cell dies, mark itself and neighbors to be updated at next tick
+                if cell && !self.rule.survive[n as usize] {
+                    next.set(idx, false);
+                    self.mark_neighbor_to_update(row, col);
+                }
             }
         }
 
@@ -233,11 +291,16 @@ impl Universe {
             )
         }
 
+        // At first, the next state of every cell must be updated
+        let mut next_cells_to_be_updated = FixedBitSet::with_capacity(size);
+        next_cells_to_be_updated.set_range(.., true);
+
         Universe {
-            rule,
+            rule: rule.to_bit_set(),
             width,
             height,
             cells,
+            next_cells_to_be_updated,
         }
     }
 
@@ -253,11 +316,16 @@ impl Universe {
             cells.set(i, rand_num < life_chance)
         }
 
+        // At first, the next state of every cell must be updated
+        let mut next_cells_to_be_updated = FixedBitSet::with_capacity(size);
+        next_cells_to_be_updated.set_range(.., true);
+
         Universe {
-            rule,
+            rule: rule.to_bit_set(),
             width,
             height,
             cells,
+            next_cells_to_be_updated,
         }
     }
 
@@ -292,5 +360,6 @@ impl Universe {
     pub fn toggle_cell(&mut self, row: u32, column: u32) {
         let idx = self.get_index(row, column);
         self.cells.set(idx, !self.cells[idx]);
+        self.mark_neighbor_to_update(row, column);
     }
 }
